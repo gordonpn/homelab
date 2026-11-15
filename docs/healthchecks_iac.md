@@ -1,6 +1,8 @@
 # Healthchecks.io Infrastructure as Code (IaC)
 
-This document details the configuration, state adoption, credential handling, and operational runbook for Healthchecks.io dead man's snitch monitoring managed via Terraform.
+This document details the Healthchecks.io dead man's snitch monitoring architecture and historical adoption runbook.
+
+> **Migration Note:** The `scraper` Healthchecks.io check (`healthchecksio_check.scraper`) and its OpenTofu configuration (`terraform/healthchecks.tf`) were migrated to `gordonpn/lectures-on-tap-scraper` so the application owns its CronJob and dead man's snitch together. `homelab` no longer declares `healthchecksio` resources directly.
 
 ---
 
@@ -8,17 +10,17 @@ This document details the configuration, state adoption, credential handling, an
 
 The homelab infrastructure separates external telemetry into distinct failure domains:
 * **Uptime Kuma (Northflank):** Responsible for real-time heartbeat push monitoring of nodes and orchestrator layers (Host OS, K3s Agent, and Docker Swarm), as well as internal HTTP services.
-* **Healthchecks.io (SaaS):** Responsible for dead man's snitches and cron execution monitoring. Jobs send pings on scheduled intervals; if a job fails or misses its deadline plus grace window, Healthchecks triggers notifications via configured integrations (Slack).
+* **Healthchecks.io (SaaS):** Responsible for dead man's snitches and cron execution monitoring. Application-specific checks (such as `scraper`) are managed in their respective application repositories.
 
 ---
 
-## 2. Inventory and Scope
+## 2. Historical Inventory and Scope
 
-### Managed Checks
+### Migrated Checks
 
-| Check Name | Slug | Schedule / Interval | Timezone | Grace | Integrations | Purpose |
+| Check Name | Slug | Schedule / Interval | Timezone | Grace | Integrations | Owner Repository |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| `scraper` | `scraper` | `*/5 10-18 * * *` | `America/New_York` | 900s (15m) | Slack (`#healthchecks`) | Monitors scheduled scrape runner jobs on K3s |
+| `scraper` | `scraper` | `*/5 10-18 * * *` | `America/New_York` | 900s (15m) | Slack (`#healthchecks`) | `gordonpn/lectures-on-tap-scraper` |
 
 * **Concrete Caller:** The `scraper` check is pinged by the scheduled web scraper workflow executing inside K3s on the self-hosted ARC runner set `arc-runner-set-scraper` (`home-lab-runners-scraper`). It issues a `start` ping upon runner job startup and a `success` ping upon clean job completion.
 
@@ -36,9 +38,9 @@ These legacy scripts do not have active checks in the current Healthchecks proje
 
 ---
 
-## 3. Terraform Provider Configuration
+## 3. Provider Pattern Reference
 
-The configuration uses the `kristofferahl/healthchecksio` provider pinned to `~> 2.3.0` in [terraform/domains.tf](../terraform/domains.tf) and declared in [terraform/healthchecks.tf](../terraform/healthchecks.tf).
+When managing Healthchecks.io checks in Terraform/OpenTofu, the configuration uses the `kristofferahl/healthchecksio` provider pinned to `~> 2.3.0`:
 
 ### Provider Declaration
 ```hcl
@@ -79,11 +81,13 @@ The read-write API key is stored securely in the macOS Keychain under service na
   security find-generic-password -s "healthchecks_api_key" -w
   ```
 * **Local variable file:**
-  Set `healthchecksio_api_key` in `terraform/terraform.tfvars` (gitignored). An example template is maintained at [terraform/terraform.tfvars.example](../terraform/terraform.tfvars.example).
+  Set `healthchecksio_api_key` in `terraform/terraform.tfvars` (gitignored) in the owning repository.
 
 ### State Adoption Procedure (Import)
-To adopt an existing Healthchecks.io check into Terraform:
-1. Capture a private backup of the configured backend using the [shared state recovery procedure](terraform_iac.md#pull-state-via-cli). Export backend and provider credentials before proceeding.
+Run every command in this procedure from the root of `gordonpn/lectures-on-tap-scraper`, whose `terraform/` directory declares `healthchecksio_check.scraper` and uses backend key `lectures-on-tap-scraper/terraform.tfstate`. Do not run these commands in `homelab`.
+
+To adopt an existing Healthchecks.io check into OpenTofu:
+1. Capture a private backup of the scraper backend (`lectures-on-tap-scraper/terraform.tfstate`) following the same backup pattern as [the shared state recovery procedure](terraform_iac.md#pull-state-via-cli). Export backend and provider credentials before proceeding.
 2. Import the check using its UUID:
    ```bash
    tofu -chdir=terraform import healthchecksio_check.scraper <check-uuid>
@@ -95,7 +99,7 @@ To adopt an existing Healthchecks.io check into Terraform:
    An exit code of `0` confirms the local configuration matches live Healthchecks state.
 
 ### Drift Detection Verification
-To verify that drift detection is functional:
+Run from the root of `gordonpn/lectures-on-tap-scraper` to verify that drift detection is functional:
 1. Introduce a deliberate temporary difference in `terraform/healthchecks.tf` (e.g. modify `grace` from 900 to 901).
 2. Run `tofu -chdir=terraform plan -detailed-exitcode`.
 3. Confirm the command exits with code `2` and displays the exact attribute diff.
@@ -112,7 +116,7 @@ Observed state transitions and deadline behaviors were verified using an isolate
 7. **Pause & Destruction:** Pausing the check halts alerting until resumed; removing the resource cleanly destroys it from Healthchecks.io.
 
 ### Rollback Procedure
-If state corruption occurs during an import attempt, stop other writers and use the [shared state recovery procedure](terraform_iac.md#restore-state). Copying a local state file does not restore the MinIO backend. Preserve locking, lineage, and serial safeguards; review any rejected restore instead of forcing it.
+Run from the root of `gordonpn/lectures-on-tap-scraper` if state corruption occurs during an import attempt: stop other writers and restore the `lectures-on-tap-scraper/terraform.tfstate` backup using the backend-aware `tofu -chdir=terraform state push` pattern in [the shared state recovery procedure](terraform_iac.md#restore-state). Copying a local state file does not restore the MinIO backend. Preserve locking, lineage, and serial safeguards; review any rejected restore instead of forcing it.
 
 `tofu import` updates the configured backend state and reads Healthchecks.io without changing the live check configuration.
 

@@ -31,10 +31,3 @@ ntfy:
   behindProxy: "true"
   authFile: "/var/lib/ntfy/user.db"
   authDefaultAccess: "read-only"
-
-lecturesNotifier:
-  schedule: "*/5 10-18 * * *"
-  image:
-    repository: ghcr.io/gordonpn/lectures-notifier
-    tag: main
-    pullPolicy: IfNotPresent
