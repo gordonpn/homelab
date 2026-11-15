@@ -1,6 +1,8 @@
 # Healthchecks.io Infrastructure as Code (IaC)
 
-This document details the configuration, state adoption, credential handling, and operational runbook for Healthchecks.io dead man's snitch monitoring managed via Terraform.
+This document details the Healthchecks.io dead man's snitch monitoring architecture and historical adoption runbook.
+
+> **Migration Note:** The `scraper` Healthchecks.io check (`healthchecksio_check.scraper`) and its OpenTofu configuration (`terraform/healthchecks.tf`) were migrated to `gordonpn/lectures-on-tap-scraper` so the application owns its CronJob and dead man's snitch together. `homelab` no longer declares `healthchecksio` resources directly.
 
 ---
 
@@ -8,17 +10,17 @@ This document details the configuration, state adoption, credential handling, an
 
 The homelab infrastructure separates external telemetry into distinct failure domains:
 * **Uptime Kuma (Northflank):** Responsible for real-time heartbeat push monitoring of nodes and orchestrator layers (Host OS, K3s Agent, and Docker Swarm), as well as internal HTTP services.
-* **Healthchecks.io (SaaS):** Responsible for dead man's snitches and cron execution monitoring. Jobs send pings on scheduled intervals; if a job fails or misses its deadline plus grace window, Healthchecks triggers notifications via configured integrations (Slack).
+* **Healthchecks.io (SaaS):** Responsible for dead man's snitches and cron execution monitoring. Application-specific checks (such as `scraper`) are managed in their respective application repositories.
 
 ---
 
-## 2. Inventory and Scope
+## 2. Historical Inventory and Scope
 
-### Managed Checks
+### Migrated Checks
 
-| Check Name | Slug | Schedule / Interval | Timezone | Grace | Integrations | Purpose |
+| Check Name | Slug | Schedule / Interval | Timezone | Grace | Integrations | Owner Repository |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| `scraper` | `scraper` | `*/5 10-18 * * *` | `America/New_York` | 900s (15m) | Slack (`#healthchecks`) | Monitors scheduled scrape runner jobs on K3s |
+| `scraper` | `scraper` | `*/5 10-18 * * *` | `America/New_York` | 900s (15m) | Slack (`#healthchecks`) | `gordonpn/lectures-on-tap-scraper` |
 
 * **Concrete Caller:** The `scraper` check is pinged by the scheduled web scraper workflow executing inside K3s on the self-hosted ARC runner set `arc-runner-set-scraper` (`home-lab-runners-scraper`). It issues a `start` ping upon runner job startup and a `success` ping upon clean job completion.
 
@@ -36,9 +38,9 @@ These legacy scripts do not have active checks in the current Healthchecks proje
 
 ---
 
-## 3. Terraform Provider Configuration
+## 3. Provider Pattern Reference
 
-The configuration uses the `kristofferahl/healthchecksio` provider pinned to `~> 2.3.0` in [terraform/domains.tf](../terraform/domains.tf) and declared in [terraform/healthchecks.tf](../terraform/healthchecks.tf).
+When managing Healthchecks.io checks in Terraform/OpenTofu, the configuration uses the `kristofferahl/healthchecksio` provider pinned to `~> 2.3.0`:
 
 ### Provider Declaration
 ```hcl
@@ -79,7 +81,7 @@ The read-write API key is stored securely in the macOS Keychain under service na
   security find-generic-password -s "healthchecks_api_key" -w
   ```
 * **Local variable file:**
-  Set `healthchecksio_api_key` in `terraform/terraform.tfvars` (gitignored). An example template is maintained at [terraform/terraform.tfvars.example](../terraform/terraform.tfvars.example).
+  Set `healthchecksio_api_key` in `terraform/terraform.tfvars` (gitignored) in the owning repository.
 
 ### State Adoption Procedure (Import)
 To adopt an existing Healthchecks.io check into Terraform:

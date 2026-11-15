@@ -11,7 +11,7 @@ This document captures the audit of unmanaged infrastructure components across t
 | **Cloudflare DNS & Edge** | 100% (Completed) | None (All 16 zone DNS records and VPS tunnel managed) | Terraform ([terraform/domains.tf](file:///terraform/domains.tf)) | Completed |
 | **Kubernetes Workloads** | 100% (Completed) | None (All workloads managed via Helmfile workloads chart) | Helmfile ([k8s/charts/helmfile.yaml](file:///k8s/charts/helmfile.yaml)) | Completed |
 | **Uptime Kuma Monitoring** | 100% (Completed) | None (7 push monitors and Slack notification imported) | Terraform ([terraform/uptime_kuma.tf](file:///terraform/uptime_kuma.tf)) | Completed |
-| **Healthchecks.io Monitoring** | Checks Managed | Slack integration configured externally in Healthchecks.io (channel attached via data source) | Terraform ([terraform/healthchecks.tf](../terraform/healthchecks.tf)) | Completed |
+| **Healthchecks.io Monitoring** | Migrated | `scraper` check migrated to `gordonpn/lectures-on-tap-scraper` | OpenTofu in `lectures-on-tap-scraper` | Completed |
 | **Terraform Deploy on Push** | 100% (Completed) | Automated PR planning and master apply verified | GitHub Actions ([.github/workflows/terraform.yml](../.github/workflows/terraform.yml)) | Completed |
 | **Host OS & Firewall (VPS)** | 100% (Completed) | Inbound host access restricted to Tailscale; public ports 22/443 closed | nftables ([scripts/vps-firewall/nftables.conf](../scripts/vps-firewall/nftables.conf)) | Completed |
 | **Legacy Host Services** | Systemd | `autossh` (`vps-tunnel.service`) on `master` | Decommissioned ([#39](https://github.com/gordonpn/homelab/issues/39)) | Completed |
@@ -79,7 +79,7 @@ All user-facing Kubernetes workloads and scaling policies are managed declarativ
   * `cloudflared`: 4-replica Cloudflare Tunnel deployment pinned to `master`.
   * `redis`: Redis deployment, service, and persistent volume claim `redis-data` on `longhorn-master`.
   * `ntfy`: Ntfy push notification deployment, service, and persistent volume claim `ntfy-data` on `local-path`.
-  * `lectures-notifier-et-10m`: Scheduled CronJob with `imagePullPolicy: IfNotPresent` and `restartPolicy: Never`.
+  *(Note: `lectures-notifier-et-10m` was subsequently migrated to `gordonpn/lectures-on-tap-scraper`.)*
 * [k8s/charts/k3s-maintenance](file:///k8s/charts/k3s-maintenance/templates/coredns-config-enforcer.yaml) enforces CoreDNS replica scaling (5 replicas) and topology spread constraints (`ScheduleAnyway`) continuously without ad-hoc manual scaling manifests.
 * Core infrastructure and workloads are deployed uniformly via `task charts:apply` and the automated GitOps workflow ([.github/workflows/gitops.yml](file:///.github/workflows/gitops.yml)).
 
@@ -134,7 +134,6 @@ All user-facing Kubernetes workloads and scaling policies are managed declarativ
   * `TF_VAR_ACCOUNT_ID`
   * `TF_VAR_KUMA_PASSWORD`
   * `TF_VAR_KUMA_SLACK_WEBHOOK_URL`
-  * `TF_VAR_HEALTHCHECKSIO_API_KEY`
 * The GitHub Actions Terraform workflow ([.github/workflows/terraform.yml](../.github/workflows/terraform.yml)) runs on `home-lab-runners`:
   * Scoped triggers on `terraform/**`, `Taskfile.yaml`, `scripts/ci/**`, `tests/**`, and the Terraform workflow itself.
   * Runs offline backend credential regression checks before contacting infrastructure.

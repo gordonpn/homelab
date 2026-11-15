@@ -6,10 +6,11 @@ This document describes the Terraform / OpenTofu remote state backend architectu
 
 ## 1. Architecture Overview
 
-Terraform configurations manage external cloud and service resources across three providers:
+Terraform configurations manage external cloud and service resources across two providers:
 1. **Cloudflare:** DNS records, Argo Tunnel (`vps-shield-tunnel`), ingress rules.
 2. **Uptime Kuma:** Decentralized push monitors and Slack notification channels.
-3. **Healthchecks.io:** Scraper cron deadline check and alerting integration.
+
+*(Healthchecks.io monitoring for `scraper` was migrated to `gordonpn/lectures-on-tap-scraper`.)*
 
 ### Remote State Backend Architecture
 
@@ -73,7 +74,6 @@ The existing MinIO deployment still shares root credentials with Longhorn backup
 Sensitive provider tokens and credentials must never be committed to Git:
 * **Local Workstations:** Stored in untracked `terraform/terraform.tfvars` (modeled in `terraform/terraform.tfvars.example`) and macOS Keychain:
   * `CLOUDFLARE_API_TOKEN`: `security find-generic-password -s "cloudflare_api_token" -w`
-  * `healthchecks_api_key`: `security find-generic-password -s "healthchecks_api_key" -w`
 * **GitHub Actions:** Stored as GitHub Actions repository secrets:
   * `MINIO_ACCESS_KEY` and `MINIO_SECRET_KEY` for the S3 backend
   * `CLOUDFLARE_API_TOKEN`
@@ -81,7 +81,6 @@ Sensitive provider tokens and credentials must never be committed to Git:
   * `TF_VAR_ACCOUNT_ID`
   * `TF_VAR_KUMA_PASSWORD`
   * `TF_VAR_KUMA_SLACK_WEBHOOK_URL`
-  * `TF_VAR_HEALTHCHECKSIO_API_KEY`
 
 ---
 
