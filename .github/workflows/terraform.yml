@@ -44,7 +44,6 @@ jobs:
       TF_VAR_account_id: ${{ secrets.TF_VAR_ACCOUNT_ID }}
       TF_VAR_kuma_password: ${{ secrets.TF_VAR_KUMA_PASSWORD }}
       TF_VAR_kuma_slack_webhook_url: ${{ secrets.TF_VAR_KUMA_SLACK_WEBHOOK_URL }}
-      TF_VAR_healthchecksio_api_key: ${{ secrets.TF_VAR_HEALTHCHECKSIO_API_KEY }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v7
