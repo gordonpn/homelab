@@ -84,8 +84,10 @@ The read-write API key is stored securely in the macOS Keychain under service na
   Set `healthchecksio_api_key` in `terraform/terraform.tfvars` (gitignored) in the owning repository.
 
 ### State Adoption Procedure (Import)
-To adopt an existing Healthchecks.io check into Terraform:
-1. Capture a private backup of the configured backend using the [shared state recovery procedure](terraform_iac.md#pull-state-via-cli). Export backend and provider credentials before proceeding.
+Run every command in this procedure from the root of `gordonpn/lectures-on-tap-scraper`, whose `terraform/` directory declares `healthchecksio_check.scraper` and uses backend key `lectures-on-tap-scraper/terraform.tfstate`. Do not run these commands in `homelab`.
+
+To adopt an existing Healthchecks.io check into OpenTofu:
+1. Capture a private backup of the scraper backend (`lectures-on-tap-scraper/terraform.tfstate`) following the same backup pattern as [the shared state recovery procedure](terraform_iac.md#pull-state-via-cli). Export backend and provider credentials before proceeding.
 2. Import the check using its UUID:
    ```bash
    tofu -chdir=terraform import healthchecksio_check.scraper <check-uuid>
@@ -97,7 +99,7 @@ To adopt an existing Healthchecks.io check into Terraform:
    An exit code of `0` confirms the local configuration matches live Healthchecks state.
 
 ### Drift Detection Verification
-To verify that drift detection is functional:
+Run from the root of `gordonpn/lectures-on-tap-scraper` to verify that drift detection is functional:
 1. Introduce a deliberate temporary difference in `terraform/healthchecks.tf` (e.g. modify `grace` from 900 to 901).
 2. Run `tofu -chdir=terraform plan -detailed-exitcode`.
 3. Confirm the command exits with code `2` and displays the exact attribute diff.
@@ -114,7 +116,7 @@ Observed state transitions and deadline behaviors were verified using an isolate
 7. **Pause & Destruction:** Pausing the check halts alerting until resumed; removing the resource cleanly destroys it from Healthchecks.io.
 
 ### Rollback Procedure
-If state corruption occurs during an import attempt, stop other writers and use the [shared state recovery procedure](terraform_iac.md#restore-state). Copying a local state file does not restore the MinIO backend. Preserve locking, lineage, and serial safeguards; review any rejected restore instead of forcing it.
+Run from the root of `gordonpn/lectures-on-tap-scraper` if state corruption occurs during an import attempt: stop other writers and restore the `lectures-on-tap-scraper/terraform.tfstate` backup using the backend-aware `tofu -chdir=terraform state push` pattern in [the shared state recovery procedure](terraform_iac.md#restore-state). Copying a local state file does not restore the MinIO backend. Preserve locking, lineage, and serial safeguards; review any rejected restore instead of forcing it.
 
 `tofu import` updates the configured backend state and reads Healthchecks.io without changing the live check configuration.
 
