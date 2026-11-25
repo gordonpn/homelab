@@ -1,0 +1,125 @@
+{{- $name := include "network-observability.jsonExporterName" . -}}
+{{- $config := .Files.Get "files/json-exporter.yml" -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $name }}-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "network-observability.labels" . | nindent 4 }}
+    app.kubernetes.io/name: {{ $name }}
+data:
+  config.yml: |
+{{ $config | indent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "network-observability.labels" . | nindent 4 }}
+    app.kubernetes.io/name: {{ $name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ $name }}
+  template:
+    metadata:
+      labels:
+        {{- include "network-observability.labels" . | nindent 8 }}
+        app.kubernetes.io/name: {{ $name }}
+      annotations:
+        checksum/config: {{ $config | sha256sum | quote }}
+    spec:
+      automountServiceAccountToken: false
+      nodeSelector:
+        kubernetes.io/hostname: {{ .Values.nodeHostname | quote }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: json-exporter
+          image: "{{ .Values.jsonExporter.image.repository }}:{{ .Values.jsonExporter.image.tag }}"
+          imagePullPolicy: {{ .Values.jsonExporter.image.pullPolicy }}
+          args:
+            - "--config.file=/etc/json_exporter/config.yml"
+            - "--web.listen-address=:{{ .Values.jsonExporter.port }}"
+          ports:
+            - name: http
+              containerPort: {{ .Values.jsonExporter.port }}
+              protocol: TCP
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 30
+            timeoutSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 15
+            timeoutSeconds: 3
+          resources:
+            {{- toYaml .Values.jsonExporter.resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/json_exporter
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: {{ $name }}-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "network-observability.labels" . | nindent 4 }}
+    app.kubernetes.io/name: {{ $name }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: {{ .Values.jsonExporter.port }}
+      targetPort: http
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: {{ $name }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "network-observability.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ $name }}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - protocol: TCP
+          port: {{ .Values.jsonExporter.port }}

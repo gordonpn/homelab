@@ -1,0 +1,95 @@
+{{- $name := include "network-observability.blackboxExporterName" . -}}
+{{- $config := .Files.Get "files/blackbox.yml" -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $name }}-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "network-observability.labels" . | nindent 4 }}
+    app.kubernetes.io/name: {{ $name }}
+data:
+  blackbox.yml: |
+{{ $config | indent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "network-observability.labels" . | nindent 4 }}
+    app.kubernetes.io/name: {{ $name }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ $name }}
+  template:
+    metadata:
+      labels:
+        {{- include "network-observability.labels" . | nindent 8 }}
+        app.kubernetes.io/name: {{ $name }}
+      annotations:
+        checksum/config: {{ $config | sha256sum | quote }}
+    spec:
+      automountServiceAccountToken: false
+      # hostNetwork is required because K3s pod networking on master lacks native IPv6.
+      # Listening is restricted strictly to the cni0 bridge IP so /probe is never exposed on LAN or Tailscale.
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      nodeSelector:
+        kubernetes.io/hostname: {{ .Values.nodeHostname | quote }}
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: blackbox-exporter
+          image: "{{ .Values.blackboxExporter.image.repository }}:{{ .Values.blackboxExporter.image.tag }}"
+          imagePullPolicy: {{ .Values.blackboxExporter.image.pullPolicy }}
+          args:
+            - "--config.file=/etc/blackbox_exporter/blackbox.yml"
+            - "--web.listen-address={{ .Values.blackboxExporter.listenAddress }}:{{ .Values.blackboxExporter.port }}"
+          ports:
+            - name: http
+              containerPort: {{ .Values.blackboxExporter.port }}
+              hostPort: {{ .Values.blackboxExporter.port }}
+              protocol: TCP
+          securityContext:
+            runAsUser: 0
+            privileged: false
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+              add:
+                - NET_RAW
+          livenessProbe:
+            httpGet:
+              host: {{ .Values.blackboxExporter.listenAddress }}
+              path: /-/healthy
+              port: {{ .Values.blackboxExporter.port }}
+            initialDelaySeconds: 5
+            periodSeconds: 30
+            timeoutSeconds: 3
+          readinessProbe:
+            httpGet:
+              host: {{ .Values.blackboxExporter.listenAddress }}
+              path: /-/healthy
+              port: {{ .Values.blackboxExporter.port }}
+            initialDelaySeconds: 5
+            periodSeconds: 15
+            timeoutSeconds: 3
+          resources:
+            {{- toYaml .Values.blackboxExporter.resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/blackbox_exporter
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: {{ $name }}-config

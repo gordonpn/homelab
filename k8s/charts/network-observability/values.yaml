@@ -1,0 +1,42 @@
+location: "home-nuc"
+nodeHostname: "master"
+prometheusReleaseLabel: "mon"
+
+jsonExporter:
+  image:
+    repository: quay.io/prometheuscommunity/json-exporter
+    tag: v0.8.0
+    pullPolicy: IfNotPresent
+  port: 7979
+  g4seTargetUrl: "http://192.168.12.1/TMI/v1/gateway/?get=signal"
+  scrapeInterval: "15s"
+  scrapeTimeout: "5s"
+  resources:
+    requests:
+      cpu: 10m
+      memory: 16Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
+
+blackboxExporter:
+  image:
+    repository: quay.io/prometheus/blackbox-exporter
+    tag: v0.29.1
+    pullPolicy: IfNotPresent
+  # Bind strictly to K3s cni0 bridge IP so /probe is unreachable from LAN or Tailscale.
+  listenAddress: "10.42.0.1"
+  port: 9115
+  coreIcmpInterval: "5s"
+  coreIcmpTimeout: "4s"
+  secondaryIcmpInterval: "15s"
+  dnsInterval: "30s"
+  httpsInterval: "30s"
+  httpsTimeout: "5s"
+  resources:
+    requests:
+      cpu: 15m
+      memory: 24Mi
+    limits:
+      cpu: 150m
+      memory: 96Mi

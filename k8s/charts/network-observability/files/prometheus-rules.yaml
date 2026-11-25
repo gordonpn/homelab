@@ -1,0 +1,137 @@
+groups:
+  - name: network-observability.recording
+    interval: 30s
+    rules:
+      - record: network:probe_failure_ratio:5m
+        expr: 1 - avg_over_time(probe_success{location="home-nuc"}[5m])
+
+      - record: network:probe_icmp_rtt_seconds:p50_5m
+        expr: quantile_over_time(0.50, (probe_icmp_duration_seconds{phase="rtt",location="home-nuc"} > 0)[5m:5s])
+
+      - record: network:probe_icmp_rtt_seconds:p95_5m
+        expr: quantile_over_time(0.95, (probe_icmp_duration_seconds{phase="rtt",location="home-nuc"} > 0)[5m:5s])
+
+      - record: network:probe_icmp_rtt_seconds:p99_5m
+        expr: quantile_over_time(0.99, (probe_icmp_duration_seconds{phase="rtt",location="home-nuc"} > 0)[5m:5s])
+
+      - record: network:probe_icmp_rtt_seconds:stddev_5m
+        expr: stddev_over_time((probe_icmp_duration_seconds{phase="rtt",location="home-nuc"} > 0)[5m:5s])
+
+  - name: network-observability.alerts
+    interval: 30s
+    rules:
+      - alert: NetworkObservabilityExporterDown
+        expr: up{job=~"network-observability-(json|blackbox)-exporter"} == 0
+        for: 5m
+        labels:
+          severity: warning
+          namespace: monitoring
+          job_name: "{{ $labels.job }}"
+        annotations:
+          summary: "Network observability exporter {{ $labels.job }} is down"
+          description: "Prometheus cannot scrape {{ $labels.job }} on master for 5 minutes."
+
+      - alert: HomeLocalRouterUnreachable
+        expr: avg_over_time(probe_success{location="home-nuc",target_name="asus-router"}[2m]) < 0.5
+        for: 2m
+        labels:
+          severity: critical
+          namespace: monitoring
+          job_name: network-icmp-ipv4-core
+        annotations:
+          summary: "ASUS LAN router (192.168.50.1) is unreachable from master"
+          description: "ICMP probe success to 192.168.50.1 dropped below 50% over 2m (current: {{ $value | humanizePercentage }})."
+
+      - alert: HomeGatewayUnreachable
+        expr: avg_over_time(probe_success{location="home-nuc",target_name="g4se-gateway"}[3m]) < 0.5
+        for: 3m
+        labels:
+          severity: critical
+          namespace: monitoring
+          job_name: network-icmp-ipv4-core
+        annotations:
+          summary: "T-Mobile G4SE gateway (192.168.12.1) is unreachable via ICMP"
+          description: "ICMP probe success to 192.168.12.1 dropped below 50% over 3m while local LAN probes remained evaluated."
+
+      - alert: HomeG4SEAPIScrapeFailing
+        expr: up{job="g4se-cellular"} == 0 or absent(g4se_5g_sinr_db{location="home-nuc"})
+        for: 5m
+        labels:
+          severity: warning
+          namespace: monitoring
+          job_name: g4se-cellular
+        annotations:
+          summary: "T-Mobile G4SE cellular API scrape failing"
+          description: "JSON Exporter failed to retrieve valid 5G SINR metrics from the G4SE gateway API for 5 minutes."
+
+      - alert: HomeCellularPoorSINR
+        expr: avg_over_time(g4se_5g_sinr_db{location="home-nuc"}[15m]) < 0
+        for: 15m
+        labels:
+          severity: warning
+          namespace: monitoring
+          job_name: g4se-cellular
+        annotations:
+          summary: "T-Mobile 5G SINR degraded below 0 dB for 15 minutes"
+          description: "15m average 5G SINR is {{ $value | printf \"%.1f\" }} dB (approximate degraded radio guideline < 0 dB)."
+
+      - alert: HomeInternetMultiTargetOutage
+        expr: count(avg_over_time(probe_success{location="home-nuc",target_class="core_external"}[3m]) < 0.5) >= 3
+        for: 3m
+        labels:
+          severity: critical
+          namespace: monitoring
+          job_name: network-observability
+        annotations:
+          summary: "Multiple independent external internet targets are unreachable"
+          description: "{{ $value }} core_external targets (Google/Quad9/Cloudflare-v6; excluding isolated cloudflare-v4) show <50% probe success over 3m."
+
+      - alert: HomeInternetIPv4OnlyDegradation
+        expr: |
+          count(network:probe_failure_ratio:5m{protocol="ipv4",target_class="core_external"} > 0.2) >= 2
+          and
+          count(network:probe_failure_ratio:5m{protocol="ipv6",target_class="core_external"} < 0.05) >= 2
+        for: 5m
+        labels:
+          severity: warning
+          namespace: monitoring
+          job_name: network-icmp-ipv4-core
+        annotations:
+          summary: "IPv4 external connectivity degraded while IPv6 remains healthy"
+          description: "Core IPv4 targets exceed 20% probe failure rate over 5m while core IPv6 targets remain >95% successful."
+
+      - alert: HomeInternetIPv6OnlyDegradation
+        expr: |
+          count(network:probe_failure_ratio:5m{protocol="ipv6",target_class="core_external"} > 0.2) >= 2
+          and
+          count(network:probe_failure_ratio:5m{protocol="ipv4",target_class="core_external"} < 0.05) >= 2
+        for: 5m
+        labels:
+          severity: warning
+          namespace: monitoring
+          job_name: network-icmp-ipv6-core
+        annotations:
+          summary: "IPv6 external connectivity degraded while IPv4 remains healthy"
+          description: "Core IPv6 targets exceed 20% probe failure rate over 5m while core IPv4 targets remain >95% successful."
+
+      - alert: HomeExternalLatencyBaselineDegraded
+        expr: avg(network:probe_icmp_rtt_seconds:p50_5m{target_class="core_external"}) > 0.12
+        for: 15m
+        labels:
+          severity: warning
+          namespace: monitoring
+          job_name: network-observability
+        annotations:
+          summary: "External core internet median RTT exceeds 120 ms for 15 minutes"
+          description: "Average 5m median RTT across core_external targets is {{ $value | humanizeDuration }}."
+
+      - alert: HomeLocalDNSFailing
+        expr: avg_over_time(probe_success{location="home-nuc",target_name="asus-dns-local"}[5m]) < 0.5
+        for: 5m
+        labels:
+          severity: warning
+          namespace: monitoring
+          job_name: network-dns-local-ipv4
+        annotations:
+          summary: "ASUS local DNS resolver (192.168.50.1:53) failing health checks"
+          description: "Local DNS probe via ASUS DNS Director / Stubby DoT fell below 50% success over 5m."

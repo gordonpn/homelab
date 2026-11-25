@@ -1,0 +1,101 @@
+modules:
+  g4se_signal:
+    valid_status_codes: [200]
+    http_client_config:
+      follow_redirects: false
+    metrics:
+      - name: g4se_5g_sinr_db
+        type: value
+        valuetype: gauge
+        path: "{.signal['5g'].sinr}"
+        allow_missing_key: true
+        help: "T-Mobile G4SE 5G SINR in dB."
+
+      - name: g4se_5g_rsrp_dbm
+        type: value
+        valuetype: gauge
+        path: "{.signal['5g'].rsrp}"
+        allow_missing_key: true
+        help: "T-Mobile G4SE 5G RSRP in dBm."
+
+      - name: g4se_5g_rsrq_db
+        type: value
+        valuetype: gauge
+        path: "{.signal['5g'].rsrq}"
+        allow_missing_key: true
+        help: "T-Mobile G4SE 5G RSRQ in dB."
+
+      - name: g4se_5g_rssi_dbm
+        type: value
+        valuetype: gauge
+        path: "{.signal['5g'].rssi}"
+        allow_missing_key: true
+        help: "T-Mobile G4SE 5G RSSI in dBm."
+
+      - name: g4se_5g_signal_bars
+        type: value
+        valuetype: gauge
+        path: "{.signal['5g'].bars}"
+        allow_missing_key: true
+        help: "T-Mobile G4SE 5G reported signal bars."
+
+      - name: g4se_5g_cell_id
+        type: value
+        valuetype: gauge
+        path: "{.signal['5g'].cid}"
+        allow_missing_key: true
+        help: "T-Mobile G4SE serving 5G physical cell ID."
+
+      - name: g4se_5g_gnb_id
+        type: value
+        valuetype: gauge
+        path: "{.signal['5g'].gNBID}"
+        allow_missing_key: true
+        help: "T-Mobile G4SE serving 5G gNodeB ID."
+
+      - name: g4se_5g_antenna
+        type: object
+        valuetype: gauge
+        path: "{.signal['5g']}"
+        allow_missing_key: true
+        help: "T-Mobile G4SE reported 5G antenna mode (value 1 with antenna_used label)."
+        labels:
+          antenna_used: "{.antennaUsed}"
+        values:
+          info: "1"
+
+      - name: g4se_5g_band
+        type: object
+        valuetype: gauge
+        path: "{.signal['5g'].bands[*]}"
+        allow_missing_key: true
+        help: "T-Mobile G4SE reported 5G cellular bands (value 1 per band label)."
+        labels:
+          band: "{@}"
+        values:
+          info: "1"
+
+      - name: g4se_generic_ipv6_enabled
+        type: value
+        valuetype: gauge
+        path: "{.signal.generic.hasIPv6}"
+        allow_missing_key: true
+        help: "Whether the T-Mobile G4SE gateway reports active IPv6 connectivity (1=true, 0=false)."
+
+      - name: g4se_generic_roaming
+        type: value
+        valuetype: gauge
+        path: "{.signal.generic.roaming}"
+        allow_missing_key: true
+        help: "Whether the T-Mobile G4SE gateway reports cellular roaming (1=true, 0=false)."
+
+      - name: g4se_generic_registration
+        type: object
+        valuetype: gauge
+        path: "{.signal.generic}"
+        allow_missing_key: true
+        help: "T-Mobile G4SE cellular registration state (value 1 with registration label)."
+        labels:
+          registration: "{.registration}"
+        values:
+          info: "1"

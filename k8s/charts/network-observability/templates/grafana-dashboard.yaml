@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-dashboard
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "network-observability.labels" . | nindent 4 }}
+    grafana_dashboard: "1"
+data:
+  home-network-cellular-observability.json: |
+{{ .Files.Get "files/grafana-dashboard.json" | indent 4 }}

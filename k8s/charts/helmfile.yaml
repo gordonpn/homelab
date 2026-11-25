@@ -156,3 +156,9 @@ releases:
       - longhorn-system/longhorn
       - kube-system/k3s-maintenance
 
+  - name: network-observability
+    namespace: monitoring
+    chart: ./network-observability
+    needs:
+      - monitoring/mon
+

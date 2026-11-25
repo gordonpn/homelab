@@ -1,0 +1,377 @@
+{{- $jsonName := include "network-observability.jsonExporterName" . -}}
+{{- $bbName := include "network-observability.blackboxExporterName" . -}}
+{{- $bbTarget := printf "%s:%v" .Values.blackboxExporter.listenAddress .Values.blackboxExporter.port -}}
+{{- $jsonTarget := printf "%s.%s.svc.cluster.local:%v" $jsonName .Release.Namespace .Values.jsonExporter.port -}}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ $jsonName }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "network-observability.labels" . | nindent 4 }}
+    release: {{ .Values.prometheusReleaseLabel | quote }}
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ $jsonName }}
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 5s
+---
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: ScrapeConfig
+metadata:
+  name: {{ $bbName }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "network-observability.labels" . | nindent 4 }}
+    release: {{ .Values.prometheusReleaseLabel | quote }}
+spec:
+  jobName: {{ $bbName }}
+  metricsPath: /metrics
+  scrapeInterval: 30s
+  scrapeTimeout: 5s
+  staticConfigs:
+    - targets:
+        - {{ $bbTarget | quote }}
+      labels:
+        location: {{ .Values.location | quote }}
+---
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: ScrapeConfig
+metadata:
+  name: {{ .Release.Name }}-g4se-cellular
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "network-observability.labels" . | nindent 4 }}
+    release: {{ .Values.prometheusReleaseLabel | quote }}
+spec:
+  jobName: g4se-cellular
+  metricsPath: /probe
+  scrapeInterval: {{ .Values.jsonExporter.scrapeInterval }}
+  scrapeTimeout: {{ .Values.jsonExporter.scrapeTimeout }}
+  params:
+    module:
+      - g4se_signal
+  staticConfigs:
+    - targets:
+        - {{ .Values.jsonExporter.g4seTargetUrl | quote }}
+      labels:
+        location: {{ .Values.location | quote }}
+        target_name: g4se-signal-api
+        target_class: gateway_api
+        protocol: ipv4
+        purpose: "T-Mobile G4SE 5G cellular signal API"
+  relabelings:
+    - sourceLabels: [__address__]
+      targetLabel: __param_target
+    - sourceLabels: [__param_target]
+      targetLabel: instance
+    - targetLabel: __address__
+      replacement: {{ $jsonTarget | quote }}
+---
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: ScrapeConfig
+metadata:
+  name: {{ .Release.Name }}-icmp-ipv4-core
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "network-observability.labels" . | nindent 4 }}
+    release: {{ .Values.prometheusReleaseLabel | quote }}
+spec:
+  jobName: network-icmp-ipv4-core
+  metricsPath: /probe
+  scrapeInterval: {{ .Values.blackboxExporter.coreIcmpInterval }}
+  scrapeTimeout: {{ .Values.blackboxExporter.coreIcmpTimeout }}
+  params:
+    module:
+      - icmp_ipv4
+  staticConfigs:
+    - targets:
+        - 192.168.50.1
+      labels:
+        location: {{ .Values.location | quote }}
+        target_name: asus-router
+        protocol: ipv4
+        target_class: local_router
+        purpose: "ASUS RT-AX58U LAN gateway"
+    - targets:
+        - 192.168.12.1
+      labels:
+        location: {{ .Values.location | quote }}
+        target_name: g4se-gateway
+        protocol: ipv4
+        target_class: cellular_gateway
+        purpose: "T-Mobile G4SE gateway"
+    - targets:
+        - 8.8.8.8
+      labels:
+        location: {{ .Values.location | quote }}
+        target_name: google-v4
+        protocol: ipv4
+        target_class: core_external
+        purpose: "Google Public DNS connectivity reference"
+    - targets:
+        - 9.9.9.9
+      labels:
+        location: {{ .Values.location | quote }}
+        target_name: quad9-v4
+        protocol: ipv4
+        target_class: core_external
+        purpose: "Quad9 connectivity reference"
+    - targets:
+        - 1.1.1.1
+      labels:
+        location: {{ .Values.location | quote }}
+        target_name: cloudflare-v4
+        protocol: ipv4
+        target_class: diagnostic_external
+        purpose: "Cloudflare IPv4 (known intermittent loss route)"
+  relabelings:
+    - sourceLabels: [__address__]
+      targetLabel: __param_target
+    - sourceLabels: [__param_target]
+      targetLabel: instance
+    - targetLabel: __address__
+      replacement: {{ $bbTarget | quote }}
+---
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: ScrapeConfig
+metadata:
+  name: {{ .Release.Name }}-icmp-ipv6-core
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "network-observability.labels" . | nindent 4 }}
+    release: {{ .Values.prometheusReleaseLabel | quote }}
+spec:
+  jobName: network-icmp-ipv6-core
+  metricsPath: /probe
+  scrapeInterval: {{ .Values.blackboxExporter.coreIcmpInterval }}
+  scrapeTimeout: {{ .Values.blackboxExporter.coreIcmpTimeout }}
+  params:
+    module:
+      - icmp_ipv6
+  staticConfigs:
+    - targets:
+        - "2001:4860:4860::8888"
+      labels:
+        location: {{ .Values.location | quote }}
+        target_name: google-v6
+        protocol: ipv6
+        target_class: core_external
+        purpose: "Google IPv6 connectivity reference"
+    - targets:
+        - "2606:4700:4700::1111"
+      labels:
+        location: {{ .Values.location | quote }}
+        target_name: cloudflare-v6
+        protocol: ipv6
+        target_class: core_external
+        purpose: "Cloudflare IPv6 comparison"
+  relabelings:
+    - sourceLabels: [__address__]
+      targetLabel: __param_target
+    - sourceLabels: [__param_target]
+      targetLabel: instance
+    - targetLabel: __address__
+      replacement: {{ $bbTarget | quote }}
+---
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: ScrapeConfig
+metadata:
+  name: {{ .Release.Name }}-icmp-ipv4-secondary
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "network-observability.labels" . | nindent 4 }}
+    release: {{ .Values.prometheusReleaseLabel | quote }}
+spec:
+  jobName: network-icmp-ipv4-secondary
+  metricsPath: /probe
+  scrapeInterval: {{ .Values.blackboxExporter.secondaryIcmpInterval }}
+  scrapeTimeout: {{ .Values.blackboxExporter.coreIcmpTimeout }}
+  params:
+    module:
+      - icmp_ipv4
+  staticConfigs:
+    - targets:
+        - 94.140.14.15
+      labels:
+        location: {{ .Values.location | quote }}
+        target_name: adguard-primary-v4
+        protocol: ipv4
+        target_class: secondary_external
+        purpose: "AdGuard Family primary IPv4 upstream"
+    - targets:
+        - 94.140.15.16
+      labels:
+        location: {{ .Values.location | quote }}
+        target_name: adguard-secondary-v4
+        protocol: ipv4
+        target_class: secondary_external
+        purpose: "AdGuard Family secondary IPv4 upstream"
+  relabelings:
+    - sourceLabels: [__address__]
+      targetLabel: __param_target
+    - sourceLabels: [__param_target]
+      targetLabel: instance
+    - targetLabel: __address__
+      replacement: {{ $bbTarget | quote }}
+---
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: ScrapeConfig
+metadata:
+  name: {{ .Release.Name }}-icmp-ipv6-secondary
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "network-observability.labels" . | nindent 4 }}
+    release: {{ .Values.prometheusReleaseLabel | quote }}
+spec:
+  jobName: network-icmp-ipv6-secondary
+  metricsPath: /probe
+  scrapeInterval: {{ .Values.blackboxExporter.secondaryIcmpInterval }}
+  scrapeTimeout: {{ .Values.blackboxExporter.coreIcmpTimeout }}
+  params:
+    module:
+      - icmp_ipv6
+  staticConfigs:
+    - targets:
+        - "2a10:50c0::bad1:ff"
+      labels:
+        location: {{ .Values.location | quote }}
+        target_name: adguard-primary-v6
+        protocol: ipv6
+        target_class: secondary_external
+        purpose: "AdGuard Family primary IPv6 upstream"
+    - targets:
+        - "2a10:50c0::bad2:ff"
+      labels:
+        location: {{ .Values.location | quote }}
+        target_name: adguard-secondary-v6
+        protocol: ipv6
+        target_class: secondary_external
+        purpose: "AdGuard Family secondary IPv6 upstream"
+  relabelings:
+    - sourceLabels: [__address__]
+      targetLabel: __param_target
+    - sourceLabels: [__param_target]
+      targetLabel: instance
+    - targetLabel: __address__
+      replacement: {{ $bbTarget | quote }}
+---
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: ScrapeConfig
+metadata:
+  name: {{ .Release.Name }}-dns-local-ipv4
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "network-observability.labels" . | nindent 4 }}
+    release: {{ .Values.prometheusReleaseLabel | quote }}
+spec:
+  jobName: network-dns-local-ipv4
+  metricsPath: /probe
+  scrapeInterval: {{ .Values.blackboxExporter.dnsInterval }}
+  scrapeTimeout: {{ .Values.blackboxExporter.coreIcmpTimeout }}
+  params:
+    module:
+      - dns_local_ipv4
+  staticConfigs:
+    - targets:
+        - "192.168.50.1:53"
+      labels:
+        location: {{ .Values.location | quote }}
+        target_name: asus-dns-local
+        protocol: ipv4
+        target_class: local_dns
+        dns_policy: asus_dns_director_stubby_adguard_dot
+        purpose: "ASUS local resolver (forwards via Stubby DoT to AdGuard Family)"
+  relabelings:
+    - sourceLabels: [__address__]
+      targetLabel: __param_target
+    - sourceLabels: [__param_target]
+      targetLabel: instance
+    - targetLabel: __address__
+      replacement: {{ $bbTarget | quote }}
+---
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: ScrapeConfig
+metadata:
+  name: {{ .Release.Name }}-https-ipv4
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "network-observability.labels" . | nindent 4 }}
+    release: {{ .Values.prometheusReleaseLabel | quote }}
+spec:
+  jobName: network-https-ipv4
+  metricsPath: /probe
+  scrapeInterval: {{ .Values.blackboxExporter.httpsInterval }}
+  scrapeTimeout: {{ .Values.blackboxExporter.httpsTimeout }}
+  params:
+    module:
+      - http_2xx_ipv4
+  staticConfigs:
+    - targets:
+        - "https://www.gstatic.com/generate_204"
+      labels:
+        location: {{ .Values.location | quote }}
+        target_name: gstatic-https-v4
+        protocol: ipv4
+        target_class: app_https
+        purpose: "Direct HTTPS IPv4 application reachability"
+    - targets:
+        - "https://cp.cloudflare.com/generate_204"
+      labels:
+        location: {{ .Values.location | quote }}
+        target_name: cloudflare-https-v4
+        protocol: ipv4
+        target_class: app_https
+        purpose: "Direct HTTPS IPv4 Cloudflare edge reachability"
+  relabelings:
+    - sourceLabels: [__address__]
+      targetLabel: __param_target
+    - sourceLabels: [__param_target]
+      targetLabel: instance
+    - targetLabel: __address__
+      replacement: {{ $bbTarget | quote }}
+---
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: ScrapeConfig
+metadata:
+  name: {{ .Release.Name }}-https-ipv6
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "network-observability.labels" . | nindent 4 }}
+    release: {{ .Values.prometheusReleaseLabel | quote }}
+spec:
+  jobName: network-https-ipv6
+  metricsPath: /probe
+  scrapeInterval: {{ .Values.blackboxExporter.httpsInterval }}
+  scrapeTimeout: {{ .Values.blackboxExporter.httpsTimeout }}
+  params:
+    module:
+      - http_2xx_ipv6
+  staticConfigs:
+    - targets:
+        - "https://www.gstatic.com/generate_204"
+      labels:
+        location: {{ .Values.location | quote }}
+        target_name: gstatic-https-v6
+        protocol: ipv6
+        target_class: app_https
+        purpose: "Direct HTTPS IPv6 application reachability"
+    - targets:
+        - "https://cp.cloudflare.com/generate_204"
+      labels:
+        location: {{ .Values.location | quote }}
+        target_name: cloudflare-https-v6
+        protocol: ipv6
+        target_class: app_https
+        purpose: "Direct HTTPS IPv6 Cloudflare edge reachability"
+  relabelings:
+    - sourceLabels: [__address__]
+      targetLabel: __param_target
+    - sourceLabels: [__param_target]
+      targetLabel: instance
+    - targetLabel: __address__
+      replacement: {{ $bbTarget | quote }}

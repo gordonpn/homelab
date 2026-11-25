@@ -63,6 +63,24 @@ alertmanager:
         alertname: ^(KubeDeploymentReplicasMismatch|KubeDeploymentRolloutStuck|KubeStateMetricsListErrors)$
       source_match:
         alertname: KubeAPIDown
+    - target_match_re:
+        alertname: ^(HomeGatewayUnreachable|HomeG4SEAPIScrapeFailing|HomeInternetMultiTargetOutage|HomeLocalDNSFailing)$
+      source_match:
+        alertname: HomeLocalRouterUnreachable
+      equal:
+        - namespace
+    - target_match_re:
+        alertname: ^(HomeG4SEAPIScrapeFailing|HomeInternetMultiTargetOutage|HomeInternetIPv4OnlyDegradation|HomeInternetIPv6OnlyDegradation|HomeLocalDNSFailing)$
+      source_match:
+        alertname: HomeGatewayUnreachable
+      equal:
+        - namespace
+    - target_match_re:
+        alertname: ^(HomeInternetIPv4OnlyDegradation|HomeInternetIPv6OnlyDegradation|HomeExternalLatencyBaselineDegraded)$
+      source_match:
+        alertname: HomeInternetMultiTargetOutage
+      equal:
+        - namespace
   service:
     nodePort: 30093
     type: NodePort
@@ -110,8 +128,8 @@ prometheusOperator:
         kubernetes.io/hostname: master
 prometheus:
   prometheusSpec:
-    retention: 7d
-    retentionSize: 8GiB
+    retention: 30d
+    retentionSize: 20GiB
     tsdb:
       outOfOrderTimeWindow: 30m
     securityContext:
@@ -123,7 +141,7 @@ prometheus:
           - ReadWriteOnce
           resources:
             requests:
-              storage: 10Gi
+              storage: 25Gi
           storageClassName: longhorn-master
     nodeSelector:
       kubernetes.io/hostname: master
