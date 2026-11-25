@@ -1,0 +1,23 @@
+{
+  "signal": {
+    "5g": {
+      "antennaUsed": "Internal_directional",
+      "bands": [
+        "n41"
+      ],
+      "bars": 4.0,
+      "cid": 45,
+      "gNBID": 4837985,
+      "rsrp": -89,
+      "rsrq": -11,
+      "rssi": -77,
+      "sinr": 6
+    },
+    "generic": {
+      "apn": "FBB.HOME",
+      "hasIPv6": true,
+      "registration": "registered",
+      "roaming": false
+    }
+  }
+}

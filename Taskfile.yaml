@@ -30,7 +30,17 @@ tasks:
     desc: Lint Terraform and Swarm workflows and shell scripts
     cmds:
       - actionlint .github/workflows/terraform.yml .github/workflows/swarm-validation.yml
-      - shellcheck scripts/ci/*.sh tests/*.sh tests/fixtures/*.sh
+      - shellcheck scripts/ci/*.sh scripts/network-annotate.sh tests/*.sh tests/fixtures/*.sh
+
+  net:test:
+    desc: Validate network-observability chart, rules, dashboard, and exporter configs
+    cmds:
+      - bash tests/network-observability.sh
+
+  net:annotate:
+    desc: Record a Grafana network-experiment annotation
+    cmds:
+      - bash scripts/network-annotate.sh {{.CLI_ARGS}}
 
   tf:test:
     desc: Test backend credential guards without contacting infrastructure
@@ -94,11 +104,18 @@ tasks:
     cmds:
       - helm lint ./workloads
 
+  charts:lint:network-observability:
+    desc: Lint local network-observability chart
+    dir: '{{.CHARTS_DIR}}'
+    cmds:
+      - helm lint ./network-observability
+
   charts:lint:all:
     desc: Lint all local charts
     cmds:
       - task: charts:lint:maintenance
       - task: charts:lint:workloads
+      - task: charts:lint:network-observability
 
   k8s:apply:network-health:
     desc: Apply network health checks from k3s-maintenance chart

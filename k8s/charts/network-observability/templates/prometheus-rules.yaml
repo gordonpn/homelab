@@ -1,0 +1,10 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ .Release.Name }}-rules
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "network-observability.labels" . | nindent 4 }}
+    release: {{ .Values.prometheusReleaseLabel | quote }}
+spec:
+{{ .Files.Get "files/prometheus-rules.yaml" | replace "location=\"home-nuc\"" (printf "location=%q" .Values.location) | indent 2 }}

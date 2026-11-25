@@ -1,0 +1,24 @@
+{
+  "signal": {
+    "5g": {
+      "antennaUsed": "External_4x4",
+      "bands": [
+        "n41",
+        "n71"
+      ],
+      "bars": 5.0,
+      "cid": 48,
+      "gNBID": 4837985,
+      "rsrp": -82,
+      "rsrq": -9,
+      "rssi": -71,
+      "sinr": 14
+    },
+    "generic": {
+      "apn": "FBB.HOME",
+      "hasIPv6": true,
+      "registration": "registered",
+      "roaming": false
+    }
+  }
+}
