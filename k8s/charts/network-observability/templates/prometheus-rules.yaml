@@ -7,4 +7,4 @@ metadata:
     {{- include "network-observability.labels" . | nindent 4 }}
     release: {{ .Values.prometheusReleaseLabel | quote }}
 spec:
-{{ .Files.Get "files/prometheus-rules.yaml" | indent 2 }}
+{{ .Files.Get "files/prometheus-rules.yaml" | replace "location=\"home-nuc\"" (printf "location=%q" .Values.location) | indent 2 }}

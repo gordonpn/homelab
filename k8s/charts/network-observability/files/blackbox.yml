@@ -44,6 +44,9 @@ modules:
       query_type: A
       recursion_desired: true
       valid_rcodes: [NOERROR]
+      validate_answer_rrs:
+        fail_if_none_matches_regexp:
+          - '\s+IN\s+A\s+[0-9.]+'
 
   # Defined for unrestricted external vantage points (e.g. RackNerd VPS).
   # Not scheduled from master because ASUS DNS Director blocks client TCP/853 DoT.

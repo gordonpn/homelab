@@ -88,9 +88,9 @@ groups:
 
       - alert: HomeInternetIPv4OnlyDegradation
         expr: |
-          count(network:probe_failure_ratio:5m{protocol="ipv4",target_class="core_external"} > 0.2) >= 2
+          count(network:probe_failure_ratio:5m{location="home-nuc",protocol="ipv4",target_class="core_external"} > 0.2) >= 2
           and
-          count(network:probe_failure_ratio:5m{protocol="ipv6",target_class="core_external"} < 0.05) >= 2
+          count(network:probe_failure_ratio:5m{location="home-nuc",protocol="ipv6",target_class="core_external"} < 0.05) >= 2
         for: 5m
         labels:
           severity: warning
@@ -102,9 +102,9 @@ groups:
 
       - alert: HomeInternetIPv6OnlyDegradation
         expr: |
-          count(network:probe_failure_ratio:5m{protocol="ipv6",target_class="core_external"} > 0.2) >= 2
+          count(network:probe_failure_ratio:5m{location="home-nuc",protocol="ipv6",target_class="core_external"} > 0.2) >= 2
           and
-          count(network:probe_failure_ratio:5m{protocol="ipv4",target_class="core_external"} < 0.05) >= 2
+          count(network:probe_failure_ratio:5m{location="home-nuc",protocol="ipv4",target_class="core_external"} < 0.05) >= 2
         for: 5m
         labels:
           severity: warning
@@ -115,7 +115,7 @@ groups:
           description: "Core IPv6 targets exceed 20% probe failure rate over 5m while core IPv4 targets remain >95% successful."
 
       - alert: HomeExternalLatencyBaselineDegraded
-        expr: avg(network:probe_icmp_rtt_seconds:p50_5m{target_class="core_external"}) > 0.12
+        expr: avg(network:probe_icmp_rtt_seconds:p50_5m{location="home-nuc",target_class="core_external"}) > 0.12
         for: 15m
         labels:
           severity: warning

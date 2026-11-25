@@ -447,7 +447,7 @@
           "fields": ""
         },
         "orientation": "auto",
-        "textMode": "auto",
+        "textMode": "value_and_name",
         "colorMode": "value",
         "graphMode": "area",
         "justifyMode": "auto"
@@ -734,7 +734,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "probe_icmp_duration_seconds{phase=\"rtt\",location=~\"$location\",target_name=~\"google-v4|google-v6\"}",
+          "expr": "probe_icmp_duration_seconds{phase=\"rtt\",location=~\"$location\",target_name=~\"google-v4|google-v6\"} > 0",
           "legendFormat": "{{target_name}}",
           "instant": true
         }
@@ -1538,7 +1538,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "probe_dns_duration_seconds{location=~\"$location\",target_name=\"asus-dns-local\"}",
+          "expr": "probe_dns_duration_seconds{phase=\"request\",location=~\"$location\",target_name=\"asus-dns-local\"}",
           "legendFormat": "ASUS DNS local (DoT -> AdGuard)"
         },
         {

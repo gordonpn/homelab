@@ -16,6 +16,11 @@ for dep in helm jq python3 curl; do
   fi
 done
 
+if ! command -v ruby >/dev/null 2>&1 && ! python3 -c 'import yaml' >/dev/null 2>&1; then
+  echo "Missing YAML parser: install ruby (with stdlib yaml) or Python PyYAML (e.g. pip install pyyaml)" >&2
+  exit 1
+fi
+
 echo "==> 1. Helm lint & template rendering"
 helm lint "$CHART_DIR" >/dev/null
 RENDERED="$(mktemp)"
@@ -98,6 +103,28 @@ for d in docs:
 print("PASS: Helm manifest security & ScrapeConfig invariants")
 PY
 
+RENDERED_CUSTOM="${TMP_DIR}/rendered-custom.yaml"
+helm template network-observability "$CHART_DIR" --namespace monitoring --set location=test-site >"$RENDERED_CUSTOM"
+JSON_CUSTOM="${TMP_DIR}/rendered-custom.jsonl"
+yaml_stream_to_json "$RENDERED_CUSTOM" >"$JSON_CUSTOM"
+python3 - "$JSON_CUSTOM" <<'PY'
+import json
+import sys
+
+docs = [json.loads(line) for line in open(sys.argv[1]) if line.strip()]
+rules = [d for d in docs if d["kind"] == "PrometheusRule"]
+assert len(rules) == 1
+exprs = [r["expr"] for g in rules[0]["spec"]["groups"] for r in g["rules"]]
+annots = [str(v) for g in rules[0]["spec"]["groups"] for r in g["rules"] for v in r.get("annotations", {}).values()]
+expr_text = "\n".join(exprs)
+annot_text = "\n".join(annots)
+assert 'location="test-site"' in expr_text, "PrometheusRule must honor custom .Values.location"
+assert 'location="home-nuc"' not in expr_text, "PrometheusRule must not retain hard-coded home-nuc location"
+assert "{{ $labels.job }}" in annot_text, "Prometheus annotation templates must remain intact"
+assert "{{ $value" in annot_text, "Prometheus value annotation templates must remain intact"
+print("PASS: PrometheusRule custom location substitution preserves PromQL templates")
+PY
+
 echo "==> 3. Validate Blackbox configuration semantics"
 BLACKBOX_JSON="${TMP_DIR}/blackbox.json"
 yaml_stream_to_json "${CHART_DIR}/files/blackbox.yml" >"$BLACKBOX_JSON"
@@ -111,7 +138,9 @@ for name in ["icmp_ipv4", "icmp_ipv6", "http_2xx_ipv4", "http_2xx_ipv6", "dns_lo
     assert mods[name][prober]["ip_protocol_fallback"] is False, f"Fallback must be false in {name}"
 assert mods["icmp_ipv4"]["icmp"]["preferred_ip_protocol"] == "ip4"
 assert mods["icmp_ipv6"]["icmp"]["preferred_ip_protocol"] == "ip6"
-print("PASS: Blackbox IPv4/IPv6 no-fallback module validation")
+answer_regexps = mods["dns_local_ipv4"]["dns"].get("validate_answer_rrs", {}).get("fail_if_none_matches_regexp", [])
+assert len(answer_regexps) >= 1, "dns_local_ipv4 must validate presence of an IN A answer record"
+print("PASS: Blackbox IPv4/IPv6 no-fallback & DNS answer validation")
 PY
 
 echo "==> 4. Validate Grafana dashboard JSON structure"
@@ -127,7 +156,10 @@ jq -e '
     "Availability",
     "Correlation & Experiments"
   ]) and
-  ([.panels[] | select(.type != "row") | .targets[]? | .expr] | all(type == "string" and length > 0))
+  ([.panels[] | select(.type != "row") | .targets[]? | .expr] | all(type == "string" and length > 0)) and
+  (.panels[] | select(.id == 6) | .options.textMode == "value_and_name") and
+  (.panels[] | select(.id == 11) | .targets[0].expr | contains("> 0")) and
+  (.panels[] | select(.id == 24) | .targets[0].expr | contains("phase=\"request\""))
 ' "${CHART_DIR}/files/grafana-dashboard.json" >/dev/null
 echo "PASS: Grafana dashboard JSON validation"
 
