@@ -2,7 +2,7 @@
 
 ## 1. Architecture & Platform Decision
 
-Network and T-Mobile G4SE cellular observability is deployed on **K3s** (`monitoring` namespace) as the local Helm chart `k8s/charts/network-observability` managed through [k8s/charts/helmfile.yaml](file:///k8s/charts/helmfile.yaml).
+Network and T-Mobile G4SE cellular observability is deployed on **K3s** (`monitoring` namespace) as the local Helm chart `k8s/charts/network-observability` managed through [k8s/charts/helmfile.yaml](../k8s/charts/helmfile.yaml).
 
 ### Components Reused vs. Newly Introduced
 
@@ -71,7 +71,7 @@ Only non-identifying radio and link-status fields are scraped (no IMEI, IMSI, IC
 
 ## 3. Alerting Strategy & Threshold Tuning
 
-Alerts are split by failure domain and wired through existing Alertmanager Slack notifications (`#homelab-alerts`) with inhibition rules in [k8s/charts/values-monitor.yaml](file:///k8s/charts/values-monitor.yaml):
+Alerts are split by failure domain and wired through existing Alertmanager Slack notifications (`#homelab-alerts`) with inhibition rules in [k8s/charts/values-monitor.yaml](../k8s/charts/values-monitor.yaml):
 
 - `HomeLocalRouterUnreachable` (`critical`, 2m): `192.168.50.1` <50% success. Inhibits gateway, API, DNS, and external outage alerts.
 - `HomeGatewayUnreachable` (`critical`, 3m): `192.168.12.1` <50% success. Inhibits API and external alerts.
@@ -102,6 +102,8 @@ kubectl get pvc -n monitoring prometheus-mon-kube-prometheus-stack-prometheus-db
 If `mon` StatefulSet upgrade later rejects an unchanged-name template diff in `helmfile`, delete the StatefulSet with `--cascade=orphan` before running `helmfile apply` (pods and PVC remain intact; Prometheus Operator recreates the StatefulSet cleanly).
 
 ### Deployment Commands
+
+`task net:test` requires `helm`, `jq`, `python3`, `curl`, and either `ruby` (standard YAML library) or Python `PyYAML` (`pip install pyyaml` / `uv pip install pyyaml`). Install optional `blackbox_exporter`, `json_exporter`, and `promtool` binaries (or pass `BLACKBOX_EXPORTER_BIN`, `JSON_EXPORTER_BIN`, `PROMTOOL_BIN`) to run live config and fixture verification.
 
 ```bash
 task net:test
@@ -165,7 +167,7 @@ mv ~/network-benchmarks/telemetry/g4se-*.jsonl ~/network-benchmarks/telemetry/ar
 
 ## 7. Gateway Placement & CAKE Experiment Workflow
 
-1. Record a **Grafana annotation** at every experiment boundary using [scripts/network-annotate.sh](file:///Users/gordonpn/workspace/homelab/scripts/network-annotate.sh) (uses `GRAFANA_TOKEN` or `GRAFANA_USER`/`GRAFANA_PASSWORD`, zero secrets in Git):
+1. Record a **Grafana annotation** at every experiment boundary using [scripts/network-annotate.sh](../scripts/network-annotate.sh) (uses `GRAFANA_TOKEN` or `GRAFANA_USER`/`GRAFANA_PASSWORD`, zero secrets in Git):
 
 ```bash
 export GRAFANA_USER=admin
