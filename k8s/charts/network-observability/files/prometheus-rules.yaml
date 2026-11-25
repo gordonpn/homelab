@@ -3,25 +3,31 @@ groups:
     interval: 30s
     rules:
       - record: network:probe_failure_ratio:5m
-        expr: 1 - avg_over_time(probe_success{location="home-nuc"}[5m])
+        expr: |
+          1 - avg_over_time(probe_success{location="home-nuc"}[5m])
 
       - record: network:probe_icmp_rtt_seconds:p50_5m
-        expr: quantile_over_time(0.50, (probe_icmp_duration_seconds{phase="rtt",location="home-nuc"} > 0)[5m:5s])
+        expr: |
+          quantile_over_time(0.50, (probe_icmp_duration_seconds{phase="rtt",location="home-nuc"} > 0)[5m:5s])
 
       - record: network:probe_icmp_rtt_seconds:p95_5m
-        expr: quantile_over_time(0.95, (probe_icmp_duration_seconds{phase="rtt",location="home-nuc"} > 0)[5m:5s])
+        expr: |
+          quantile_over_time(0.95, (probe_icmp_duration_seconds{phase="rtt",location="home-nuc"} > 0)[5m:5s])
 
       - record: network:probe_icmp_rtt_seconds:p99_5m
-        expr: quantile_over_time(0.99, (probe_icmp_duration_seconds{phase="rtt",location="home-nuc"} > 0)[5m:5s])
+        expr: |
+          quantile_over_time(0.99, (probe_icmp_duration_seconds{phase="rtt",location="home-nuc"} > 0)[5m:5s])
 
       - record: network:probe_icmp_rtt_seconds:stddev_5m
-        expr: stddev_over_time((probe_icmp_duration_seconds{phase="rtt",location="home-nuc"} > 0)[5m:5s])
+        expr: |
+          stddev_over_time((probe_icmp_duration_seconds{phase="rtt",location="home-nuc"} > 0)[5m:5s])
 
   - name: network-observability.alerts
     interval: 30s
     rules:
       - alert: NetworkObservabilityExporterDown
-        expr: up{job=~"network-observability-(json|blackbox)-exporter"} == 0
+        expr: |
+          up{job=~"network-observability-(json|blackbox)-exporter"} == 0
         for: 5m
         labels:
           severity: warning
@@ -32,7 +38,8 @@ groups:
           description: "Prometheus cannot scrape {{ $labels.job }} on master for 5 minutes."
 
       - alert: HomeLocalRouterUnreachable
-        expr: avg_over_time(probe_success{location="home-nuc",target_name="asus-router"}[2m]) < 0.5
+        expr: |
+          avg_over_time(probe_success{location="home-nuc",target_name="asus-router"}[2m]) < 0.5
         for: 2m
         labels:
           severity: critical
@@ -43,7 +50,8 @@ groups:
           description: "ICMP probe success to 192.168.50.1 dropped below 50% over 2m (current: {{ $value | humanizePercentage }})."
 
       - alert: HomeGatewayUnreachable
-        expr: avg_over_time(probe_success{location="home-nuc",target_name="g4se-gateway"}[3m]) < 0.5
+        expr: |
+          avg_over_time(probe_success{location="home-nuc",target_name="g4se-gateway"}[3m]) < 0.5
         for: 3m
         labels:
           severity: critical
@@ -54,7 +62,8 @@ groups:
           description: "ICMP probe success to 192.168.12.1 dropped below 50% over 3m while local LAN probes remained evaluated."
 
       - alert: HomeG4SEAPIScrapeFailing
-        expr: up{job="g4se-cellular"} == 0 or absent(g4se_5g_sinr_db{location="home-nuc"})
+        expr: |
+          up{job="g4se-cellular"} == 0 or absent(g4se_5g_sinr_db{location="home-nuc"})
         for: 5m
         labels:
           severity: warning
@@ -65,7 +74,8 @@ groups:
           description: "JSON Exporter failed to retrieve valid 5G SINR metrics from the G4SE gateway API for 5 minutes."
 
       - alert: HomeCellularPoorSINR
-        expr: avg_over_time(g4se_5g_sinr_db{location="home-nuc"}[15m]) < 0
+        expr: |
+          avg_over_time(g4se_5g_sinr_db{location="home-nuc"}[15m]) < 0
         for: 15m
         labels:
           severity: warning
@@ -76,7 +86,8 @@ groups:
           description: "15m average 5G SINR is {{ $value | printf \"%.1f\" }} dB (approximate degraded radio guideline < 0 dB)."
 
       - alert: HomeInternetMultiTargetOutage
-        expr: count(avg_over_time(probe_success{location="home-nuc",target_class="core_external"}[3m]) < 0.5) >= 3
+        expr: |
+          count(avg_over_time(probe_success{location="home-nuc",target_class="core_external"}[3m]) < 0.5) >= 3
         for: 3m
         labels:
           severity: critical
@@ -115,7 +126,8 @@ groups:
           description: "Core IPv6 targets exceed 20% probe failure rate over 5m while core IPv4 targets remain >95% successful."
 
       - alert: HomeExternalLatencyBaselineDegraded
-        expr: avg(network:probe_icmp_rtt_seconds:p50_5m{location="home-nuc",target_class="core_external"}) > 0.12
+        expr: |
+          avg(network:probe_icmp_rtt_seconds:p50_5m{location="home-nuc",target_class="core_external"}) > 0.12
         for: 15m
         labels:
           severity: warning
@@ -126,7 +138,8 @@ groups:
           description: "Average 5m median RTT across core_external targets is {{ $value | humanizeDuration }}."
 
       - alert: HomeLocalDNSFailing
-        expr: avg_over_time(probe_success{location="home-nuc",target_name="asus-dns-local"}[5m]) < 0.5
+        expr: |
+          avg_over_time(probe_success{location="home-nuc",target_name="asus-dns-local"}[5m]) < 0.5
         for: 5m
         labels:
           severity: warning

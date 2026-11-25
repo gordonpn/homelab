@@ -103,27 +103,30 @@ for d in docs:
 print("PASS: Helm manifest security & ScrapeConfig invariants")
 PY
 
-RENDERED_CUSTOM="${TMP_DIR}/rendered-custom.yaml"
-helm template network-observability "$CHART_DIR" --namespace monitoring --set location=test-site >"$RENDERED_CUSTOM"
-JSON_CUSTOM="${TMP_DIR}/rendered-custom.jsonl"
-yaml_stream_to_json "$RENDERED_CUSTOM" >"$JSON_CUSTOM"
-python3 - "$JSON_CUSTOM" <<'PY'
+for custom_location in "test-site" "lab: west"; do
+  RENDERED_CUSTOM="${TMP_DIR}/rendered-custom.yaml"
+  helm template network-observability "$CHART_DIR" --namespace monitoring --set "location=${custom_location}" >"$RENDERED_CUSTOM"
+  JSON_CUSTOM="${TMP_DIR}/rendered-custom.jsonl"
+  yaml_stream_to_json "$RENDERED_CUSTOM" >"$JSON_CUSTOM"
+  python3 - "$JSON_CUSTOM" "$custom_location" <<'PY'
 import json
 import sys
 
 docs = [json.loads(line) for line in open(sys.argv[1]) if line.strip()]
+expected_location = sys.argv[2]
 rules = [d for d in docs if d["kind"] == "PrometheusRule"]
 assert len(rules) == 1
 exprs = [r["expr"] for g in rules[0]["spec"]["groups"] for r in g["rules"]]
 annots = [str(v) for g in rules[0]["spec"]["groups"] for r in g["rules"] for v in r.get("annotations", {}).values()]
 expr_text = "\n".join(exprs)
 annot_text = "\n".join(annots)
-assert 'location="test-site"' in expr_text, "PrometheusRule must honor custom .Values.location"
+assert f'location="{expected_location}"' in expr_text, f"PrometheusRule must honor custom location {expected_location!r}"
 assert 'location="home-nuc"' not in expr_text, "PrometheusRule must not retain hard-coded home-nuc location"
 assert "{{ $labels.job }}" in annot_text, "Prometheus annotation templates must remain intact"
 assert "{{ $value" in annot_text, "Prometheus value annotation templates must remain intact"
-print("PASS: PrometheusRule custom location substitution preserves PromQL templates")
+print(f"PASS: PrometheusRule custom location ({expected_location}) preserves PromQL templates")
 PY
+done
 
 echo "==> 3. Validate Blackbox configuration semantics"
 BLACKBOX_JSON="${TMP_DIR}/blackbox.json"
@@ -159,7 +162,7 @@ jq -e '
   ([.panels[] | select(.type != "row") | .targets[]? | .expr] | all(type == "string" and length > 0)) and
   (.panels[] | select(.id == 6) | .options.textMode == "value_and_name") and
   (.panels[] | select(.id == 11) | .targets[0].expr | contains("> 0")) and
-  (.panels[] | select(.id == 24) | .targets[0].expr | contains("phase=\"request\""))
+  (.panels[] | select(.id == 24) | .targets[0].expr | (contains("phase=\"request\"") and contains("ignoring(phase)") and contains("probe_success")))
 ' "${CHART_DIR}/files/grafana-dashboard.json" >/dev/null
 echo "PASS: Grafana dashboard JSON validation"
 

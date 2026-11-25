@@ -1538,7 +1538,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "probe_dns_duration_seconds{phase=\"request\",location=~\"$location\",target_name=\"asus-dns-local\"}",
+          "expr": "probe_dns_duration_seconds{phase=\"request\",location=~\"$location\",target_name=\"asus-dns-local\"} and ignoring(phase) (probe_success{location=~\"$location\",target_name=\"asus-dns-local\"} == 1)",
           "legendFormat": "ASUS DNS local (DoT -> AdGuard)"
         },
         {
